@@ -1,0 +1,2 @@
+2018-08-30 19:29:33,686 - gensim.models.utils_any2vec - INFO - loading projection weights from /home/dongkuiyao/sentiment_analysis/word2vec_model/news_12g_baidubaike_20g_novel_90g_embedding_64.bin
+2018-08-30 19:29:33,687 - smart_open.smart_open_lib - DEBUG - {'kw': {}, 'mode': 'rb', 'uri': u'/home/dongkuiyao/sentiment_analysis/word2vec_model/news_12g_baidubaike_20g_novel_90g_embedding_64.bin'}
