@@ -95,7 +95,7 @@ class Train(object):
 
 
 if __name__ == '__main__':
-    model = Train()
-    model.train()
+    tra = Train()
+    tra.train()
     eval = Evaluate()
     eval.evaluate()

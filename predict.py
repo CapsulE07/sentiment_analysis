@@ -26,53 +26,76 @@ class Predict(object):
         self.config = configparser.ConfigParser()
         self.config.read(self.config_path, encoding='utf-8-sig')
 
-        test_batch_size = float(self.config.get("lstm_hyperparameter", "test_batch_size"))
-        num_classes = int(self.config.get("lstm_hyperparameter", "num_classes"))
+        self.test_batch_size = float(self.config.get("lstm_hyperparameter", "test_batch_size"))
+        self.num_classes = int(self.config.get("lstm_hyperparameter", "num_classes"))
         self.data_helper = DataPreprocess()
 
-        tf.reset_default_graph()
-
-        session_conf = tf.ConfigProto(
-            allow_soft_placement=True,
-            log_device_placement=True)
-        self.sess = tf.Session(config=session_conf)
-        self.net = Network(batch_size=test_batch_size, num_class=num_classes)
-
         # 加载模型到sess中
-        self.restore()
-        print('load susess')
+        self.graph, self.sess = self.restore()
 
     def restore(self):
-        saver = tf.train.Saver()
+        # tf.reset_default_graph()
         checkpoint_file = tf.train.latest_checkpoint(CKPT_DIR)
-        saver.restore(self.sess, checkpoint_file)
+        graph = tf.Graph()
+        with graph.as_default():
+            session_conf = tf.ConfigProto(
+                allow_soft_placement=True,
+                log_device_placement=True)
+            sess = tf.Session(config=session_conf)
+            with sess.as_default():
+                # set a new  meta graph and restore variables
+                self.net = Network(batch_size=self.test_batch_size, num_class=self.num_classes)
+                saver = tf.train.Saver()
+                saver.restore(sess, checkpoint_file)
+        print('load success')
+        return graph, sess
 
-    def predict(self):
+    def predict(self, pre_string=None):
+        """
+            在有输入字符的情况下，返回测试结果
+            在没有输入字符的情况下，无限循环，持续测试，直至输入的字符为"end"
+        :rtype: str
+        """
+        # Get the placeholders from the graph by name
+        input_data = self.graph.get_operation_by_name("input/input_data").outputs[0]
+        labels = self.graph.get_operation_by_name("input/labels").outputs[0]
+        # Tensors we want to evaluate
+        predicitons = self.graph.get_operation_by_name("output/predictions").outputs[0]
+
         while True:
             try:
                 # 获取测试的句子向量
-                input_sen = raw_input("input a sentence:\n")
-                if input_sen == "end":
-                    break
-                input_sen_list = []
+                if pre_string:
+                    input_sen = pre_string
+                else:
+                    input_sen = raw_input("input a sentence:\n")
+                    if input_sen == "end":
+                        break
+                print("Predict sentence is: {0}".format(input_sen))
 
+                input_sen_list = []
                 input_sen_list.append(input_sen)
                 input_sen_list = self.data_helper.do_tokenize(input_sen_list)
-                sen_array = self.data_helper.build_train_sen(sen_list=input_sen_list, max_sen_length=28, model=model)
-                print("length of input_sen_list", len(input_sen_list))
 
-                print("batches shape ", sen_array.shape)
+                sen_array = self.data_helper.build_train_sen(sen_list=input_sen_list, max_sen_length=28,
+                                                             model=self.data_helper.model)
 
-                y, predictions, scores = self.sess.run([self.net.y, self.net.predictions, self.net.scores],
-                                                       feed_dict={self.net.input_data: sen_array})
+                result = self.sess.run([predicitons], feed_dict={input_data: sen_array})
 
-                print(
-                    ' Predict digit: y, predictions, scores: ', np.argmax(y[0]), predictions, scores)
+                if int(result[0][0]) == 0:
+                    res = "positive"
+                else:
+                    res = "negative"
+                print(' Predict class is ： {0} '.format(res))
+                # print(' Predict class is {0}: '.format(s))
+
+                if pre_string:
+                    return res
 
             except Exception as e:
                 print(e)
 
 
 if __name__ == '__main__':
-    model = Predict()
-    model.predict()
+    pre = Predict()
+    pre.predict()

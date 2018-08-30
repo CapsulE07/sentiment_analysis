@@ -80,7 +80,7 @@ class Network(object):
             output = outputs[:, -1, :]
 
             self.scores = tf.nn.xw_plus_b(output, weight, bias, name="scores")
-            self.y = tf.nn.softmax(self.scores)
+            self.y = tf.nn.softmax(self.scores,name="predict_classes")
             self.predictions = tf.argmax(self.scores, 1, name="predictions")
 
         # Accuracy

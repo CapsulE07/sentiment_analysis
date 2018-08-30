@@ -60,16 +60,16 @@ class Evaluate(object):
         input_data = self.graph.get_operation_by_name("input/input_data").outputs[0]
         labels = self.graph.get_operation_by_name("input/labels").outputs[0]
         # Tensors we want to evaluate
-        predictions = self.graph.get_operation_by_name("output/predictions").outputs[0]
         final_predictions = self.graph.get_operation_by_name("accuracy/final_predictions").outputs[0]
 
         total_nums = 0
         total_true = 0
+
         for i in range(1000):
             next_batch, next_batch_labels = self.data_helper.get_train_batch(
                 self.data_helper.total_content_matrix, self.data_helper.neg_content_len,
                 self.data_helper.pos_content_len, self.data_helper.max_sen_length)
-
+            print(next_batch)
             batch_predictions = self.sess.run(final_predictions,
                                               feed_dict={input_data: next_batch, labels: next_batch_labels})
 
@@ -84,5 +84,5 @@ class Evaluate(object):
 
 
 if __name__ == '__main__':
-    model = Evaluate()
-    model.evaluate()
+    eva = Evaluate()
+    eva.evaluate()
