@@ -15,8 +15,6 @@ from random import randint
 from network import Network
 from eval import Evaluate
 
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 # setting logging configuration
 logger = logging.getLogger()
@@ -40,14 +38,38 @@ class Train(object):
         self.config_path = "sentiment_analysis.config"
         self.config = configparser.ConfigParser()
         self.config.read(self.config_path, encoding='utf-8-sig')
-        train_batch_size = int(self.config.get("lstm_hyperparameter", "train_batch_size"))
-        self.net = Network(batch_size=train_batch_size, num_class=2)
+        self.train_batch_size = int(self.config.get("lstm_hyperparameter", "batch_size"))
+
         self.data_helper = DataPreprocess()
+        self.total_content_matrix, self.neg_content_len, self.pos_content_len, self.max_sen_length = self.load_relevant_data()
+
+        # self.graph, self.sess = self.loadmodel()
+        self.net = Network(batch_size=self.train_batch_size, num_class=2, max_sen_length=self.max_sen_length)
         session_conf = tf.ConfigProto(
             allow_soft_placement=True,
             log_device_placement=True)
         self.sess = tf.Session(config=session_conf)
         self.sess.run(tf.global_variables_initializer())
+
+    def load_relevant_data(self):
+        neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length, neg_content_len, pos_content_len = self.data_helper.load_corpus()
+        total_content_matrix, labels = self.data_helper.loadembeddings()
+        return total_content_matrix, neg_content_len, pos_content_len, max_sen_length
+
+    # def loadmodel(self):
+    #     # tf.reset_default_graph()
+    #     graph = tf.Graph()
+    #     with graph.as_default():
+    #         session_conf = tf.ConfigProto(
+    #             allow_soft_placement=True,
+    #             log_device_placement=True)
+    #         sess = tf.Session(config=session_conf)
+    #         with sess.as_default():
+    #             # set a new  meta graph and restore variables
+    #             self.net = Network(batch_size=self.train_batch_size, num_class=2, max_sen_length=self.max_sen_length)
+    #             sess.run(tf.global_variables_initializer())
+    #     print('load success')
+    #     return graph, sess
 
     def train(self):
 
@@ -70,10 +92,9 @@ class Train(object):
 
         while step < iterations:
 
-            next_batch, next_batch_labels = self.data_helper.get_train_batch(self.data_helper.total_content_matrix,
-                                                                             self.data_helper.neg_content_len,
-                                                                             self.data_helper.pos_content_len,
-                                                                             self.data_helper.max_sen_length)
+            next_batch, next_batch_labels = self.data_helper.get_train_batch(self.total_content_matrix,
+                                                                             self.neg_content_len, self.pos_content_len,
+                                                                             self.max_sen_length)
             summary, _ = self.sess.run([self.net.merged, self.net.optimizer],
                                        feed_dict={self.net.input_data: next_batch, self.net.labels: next_batch_labels})
             summary_writer.add_summary(summary, step)
@@ -90,12 +111,11 @@ class Train(object):
                 print("saved to %s" % save_path)
             step += 1
 
-
         summary_writer.close()
 
 
 if __name__ == '__main__':
     tra = Train()
     tra.train()
-    eval = Evaluate()
-    eval.evaluate()
+    # eval = Evaluate()
+    # eval.evaluate()

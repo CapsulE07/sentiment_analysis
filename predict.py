@@ -16,6 +16,8 @@ from network import Network
 
 CKPT_DIR = 'models'
 
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 
 class Predict(object):
 
@@ -26,9 +28,11 @@ class Predict(object):
         self.config = configparser.ConfigParser()
         self.config.read(self.config_path, encoding='utf-8-sig')
 
-        self.test_batch_size = float(self.config.get("lstm_hyperparameter", "test_batch_size"))
+        self.predict_batch_size = float(self.config.get("lstm_hyperparameter", "predict_batch_size"))
         self.num_classes = int(self.config.get("lstm_hyperparameter", "num_classes"))
         self.data_helper = DataPreprocess()
+
+        self.word2vec_model, _, _ = self.data_helper.load_word2vec()
 
         # 加载模型到sess中
         self.graph, self.sess = self.restore()
@@ -44,7 +48,7 @@ class Predict(object):
             sess = tf.Session(config=session_conf)
             with sess.as_default():
                 # set a new  meta graph and restore variables
-                self.net = Network(batch_size=self.test_batch_size, num_class=self.num_classes)
+                self.net = Network(batch_size=self.predict_batch_size, num_class=self.num_classes, max_sen_length=28)
                 saver = tf.train.Saver()
                 saver.restore(sess, checkpoint_file)
         print('load success')
@@ -68,7 +72,7 @@ class Predict(object):
                 if pre_string:
                     input_sen = pre_string
                 else:
-                    input_sen = raw_input("input a sentence:\n")
+                    input_sen = input("input a sentence:\n")
                     if input_sen == "end":
                         break
                 print("Predict sentence is: {0}".format(input_sen))
@@ -78,7 +82,7 @@ class Predict(object):
                 input_sen_list = self.data_helper.do_tokenize(input_sen_list)
 
                 sen_array = self.data_helper.build_train_sen(sen_list=input_sen_list, max_sen_length=28,
-                                                             model=self.data_helper.model)
+                                                             model=self.word2vec_model)
 
                 result = self.sess.run([predicitons], feed_dict={input_data: sen_array})
 
@@ -86,7 +90,7 @@ class Predict(object):
                     res = "positive"
                 else:
                     res = "negative"
-                print(' Predict class is ： {0} '.format(res))
+                print('Predict class is ： {0} '.format(res))
                 # print(' Predict class is {0}: '.format(s))
 
                 if pre_string:

@@ -13,8 +13,6 @@ from collections import Counter
 import threadpool
 from random import randint
 
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 # setting logging configuration
 logger = logging.getLogger()
@@ -33,7 +31,7 @@ logger.addHandler(fileHandler)
 # 构建图
 class Network(object):
 
-    def __init__(self, batch_size, num_class):
+    def __init__(self, batch_size,num_class, max_sen_length):
         config_path = "sentiment_analysis.config"
         self.config = configparser.ConfigParser()
         self.config.read(config_path, encoding='utf-8-sig')
@@ -47,11 +45,6 @@ class Network(object):
         learning_rate = float(self.config.get("lstm_hyperparameter", "learning_rate"))
         layers_num = int(self.config.get("lstm_hyperparameter", "layers_num"))
         l2_regularizer = float(self.config.get("lstm_hyperparameter", "l2_regularizer"))
-
-        data_helper = DataPreprocess()
-
-        ## 获取训练数据
-        model, vector, word_list, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length = data_helper.load_file()
 
         # """reset graph"""
         # tf.reset_default_graph()

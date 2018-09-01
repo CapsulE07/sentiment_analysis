@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="On explicit save action">
+  <component name="PublishConfigData" autoUpload="On explicit save action" serverName="dongkuiyao@192.168.52.225:22">
     <serverData>
       <paths name="dongkuiyao@115.231.103.57:22">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="dongkuiyao@115.231.103.57:22 (1)">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
@@ -13,6 +20,20 @@
         <serverdata>
           <mappings>
             <mapping deploy="/home/dongkuiyao/sentiment_analysis" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="dongkuiyao@192.168.52.225:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/dongkuiyao/dl_project/sentiment_analysis" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="dongkuiyao@192.168.52.226:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/dongkuiyao/dl_project/sentiment_analysis" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

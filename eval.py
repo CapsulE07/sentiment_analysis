@@ -3,14 +3,11 @@
 import tensorflow as tf
 import logging
 import configparser
-
+import os
 from data_preprocess import DataPreprocess
 import sys
 from network import Network
 import numpy as np
-
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 # setting logging configuration
 logger = logging.getLogger()
@@ -24,7 +21,7 @@ consoleHandler.setFormatter(formatter)
 fileHandler.setFormatter(formatter)
 logger.addHandler(consoleHandler)
 logger.addHandler(fileHandler)
-
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 CKPT_DIR = "model"
 
 
@@ -37,6 +34,9 @@ class Evaluate(object):
         self.config = configparser.ConfigParser()
         self.config.read(self.config_path, encoding='utf-8-sig')
 
+        self.total_content_matrix, self.neg_content_len, self.pos_content_len, self.max_sen_length = self.load_relevant_data()
+
+
         self.graph, self.sess = self.restore()
         logging.info('load success')
 
@@ -47,13 +47,20 @@ class Evaluate(object):
         with graph.as_default():
             session_conf = tf.ConfigProto(
                 allow_soft_placement=True,
-                log_device_placement=True)
+                log_device_placement=True,
+                )
             sess = tf.Session(config=session_conf)
             with sess.as_default():
                 # Load the saved meta graph and restore variables
                 saver = tf.train.import_meta_graph("{}.meta".format(checkpoint_file))
                 saver.restore(sess, checkpoint_file)
         return graph, sess
+
+    def load_relevant_data(self):
+        neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length, neg_content_len, pos_content_len = self.data_helper.load_corpus()
+        total_content_matrix, labels = self.data_helper.loadembeddings()
+        return total_content_matrix, neg_content_len, pos_content_len, max_sen_length
+
 
     def evaluate(self):
         # Get the placeholders from the graph by name
@@ -66,10 +73,9 @@ class Evaluate(object):
         total_true = 0
 
         for i in range(1000):
-            next_batch, next_batch_labels = self.data_helper.get_train_batch(
-                self.data_helper.total_content_matrix, self.data_helper.neg_content_len,
-                self.data_helper.pos_content_len, self.data_helper.max_sen_length)
-            print(next_batch)
+            next_batch, next_batch_labels = self.data_helper.get_test_batch(
+                self.total_content_matrix, self.neg_content_len,
+                self.pos_content_len, self.max_sen_length)
             batch_predictions = self.sess.run(final_predictions,
                                               feed_dict={input_data: next_batch, labels: next_batch_labels})
 

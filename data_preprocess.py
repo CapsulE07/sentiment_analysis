@@ -10,9 +10,7 @@ import sys
 from collections import Counter
 import threadpool
 from random import randint
-
-reload(sys)
-sys.setdefaultencoding('utf8')
+import time
 
 drop_stopwords_sentences_list = []
 stopwords_list = []
@@ -23,15 +21,20 @@ class DataPreprocess(object):
         config_path = "sentiment_analysis.config"
         self.config = configparser.ConfigParser()
         self.config.read(config_path, encoding='utf-8-sig')
-        self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.get("input_file_path", "word2vec_bin_path"),
-                                                                binary=True)
+        # self.word2vec_model = KeyedVectors.load_word2vec_format(self.config.get("input_file_path", "word2vec_bin_path"),
+        #                                                         binary=True)
 
-        model, vector, word_list, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length = self.load_file()
-        self.neg_content_len, self.pos_content_len, self.total_content_matrix, self.model, self.max_sen_length = self.build_sen2vec_matrix(
-            model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length)
+        self.labels_path = self.config.get("word2vec_parameter", "labels_path")
+        self.total_comment_matrix_path = self.config.get("word2vec_parameter", "total_comment_matrix_path")
 
+        # model, vector, word_list, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length = self.load_file()
+
+        # self.neg_content_len, self.pos_content_len, self.total_content_matrix, self.model, self.max_sen_length = self.build_sen2vec_matrix(
+        #     model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length)
+
+        # 生成向量text 和labels
         # total_content_matrix, labels = self.generatewordembeddings(
-        #     model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length, "wordembeddings/")
+        #     model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length)
 
     def duplicate_remove(self, sentences_list):
         sentences_list = list(set(sentences_list))
@@ -155,12 +158,23 @@ class DataPreprocess(object):
         max_sen_length: the max_length of sentences that we need to select
     """
 
-    def load_file(self):
-        logging.info("loading word2vec bin file...")
 
+    def load_word2vec(self):
+        start = time.time()
+        word2vec_model = KeyedVectors.load_word2vec_format(self.config.get("input_file_path", "word2vec_bin_path"),
+                                                           binary=True)
+        tmp = time.time()
+        print("加载 word2vec_model 花费时间为： ", tmp - start)
+        logging.info("loading word2vec bin file...")
         logging.info("loading word2vec npy file ...")
         vector = np.load(self.config.get("input_file_path", "word2vec_npy_path"))
-        word_list = self.word2vec_model.wv.vocab.keys()
+        word_list = word2vec_model.wv.vocab.keys()
+
+        end = time.time()
+        print("加载vector ，word_list花费时间为： " , end - tmp)
+        return word2vec_model, vector, word_list
+
+    def load_corpus(self):
         logging.info("loading nagetive and positive file ...")
         neg_content_list = self.read_file_name(self.config.get("input_file_path", "neg_file_path"))
         pos_path = self.config.get("input_file_path", "pos_file_path")
@@ -174,14 +188,16 @@ class DataPreprocess(object):
                                                 stopwords_drop=False)
         pos_content_list = self.data_preprocess(sentences_list=pos_content_list, remove_duplicate=True,
                                                 stopwords_drop=False)
-
         print("neg_content_list 的长度为 {0}".format(len(neg_content_list)))
         print("pos_content_list 的长度为 {0}".format(len(pos_content_list)))
         logging.info("sentence tokenized ...")
         neg_tokenized_content_list = self.do_tokenize(neg_content_list)
         pos_tokenized_content_list = self.do_tokenize(pos_content_list)
         max_sen_length = self.calculate_len_sen(pos_tokenized_content_list + neg_tokenized_content_list)
-        return self.word2vec_model, vector, word_list, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length
+
+        neg_content_len = len(neg_tokenized_content_list)
+        pos_content_len = len(pos_tokenized_content_list)
+        return neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length, neg_content_len, pos_content_len
 
     def build_train_sen(self, sen_list, max_sen_length, model):
         total_sen_vec_list = []
@@ -206,7 +222,7 @@ class DataPreprocess(object):
         return np.array(total_sen_vec_list)
 
     def get_train_batch(self, total_content_matrix, neg_content_len, pos_content_len, max_sen_length):
-        batch_size = int(self.config.get("lstm_hyperparameter", "train_batch_size"))
+        batch_size = int(self.config.get("lstm_hyperparameter", "batch_size"))
         word_dimension = int(self.config.get("word2vec_parameter", "dimension"))
         labels = []
         batch_matrix = np.zeros([batch_size, max_sen_length, word_dimension])
@@ -221,7 +237,7 @@ class DataPreprocess(object):
         return batch_matrix, labels
 
     def get_test_batch(self, total_content_matrix, neg_content_len, pos_content_len, max_sen_length):
-        batch_size = int(self.config.get("lstm_hyperparameter", "test_batch_size"))
+        batch_size = int(self.config.get("lstm_hyperparameter", "batch_size"))
         word_dimension = int(self.config.get("word2vec_parameter", "dimension"))
         labels = []
         batch_matrix = np.zeros([batch_size, max_sen_length, word_dimension])
@@ -234,23 +250,6 @@ class DataPreprocess(object):
                 labels.append([1, 0])
             batch_matrix[i] = total_content_matrix[num - 1:num]
         return batch_matrix, labels
-
-    """
-    this function is order to build sentence vector
-    args:
-        model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length
-    return:
-        null
-    # """
-
-    def build_sen2vec_matrix(self, model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length):
-        neg_content_len = len(neg_tokenized_content_list)
-        pos_content_len = len(pos_tokenized_content_list)
-        neg_content_array = self.build_train_sen(neg_tokenized_content_list, max_sen_length, model)
-        pos_content_array = self.build_train_sen(pos_tokenized_content_list, max_sen_length, model)
-        total_content_matrix = np.concatenate((neg_content_array, pos_content_array), axis=0)
-        print(total_content_matrix.shape)
-        return neg_content_len, pos_content_len, total_content_matrix, model, max_sen_length
 
     def batch_iter(self, data, batch_size, num_epochs, shuffle=True):
         """
@@ -272,35 +271,75 @@ class DataPreprocess(object):
                 yield shuffled_data[start_index:end_index]
 
     def generatewordembeddings(self, model, neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length,
-                               store_path):
+                               ):
         neg_content_len = len(neg_tokenized_content_list)
         pos_content_len = len(pos_tokenized_content_list)
         neg_content_array = self.build_train_sen(neg_tokenized_content_list, max_sen_length, model)
         pos_content_array = self.build_train_sen(pos_tokenized_content_list, max_sen_length, model)
-        total_content_matrix = np.concatenate((pos_content_array, neg_content_array), axis=0)
-        labels = np.zeros((len(total_content_matrix), 1))
-        labels[:pos_content_len] = 1
-        wd_file_name = store_path + "total_content_matrix.txt"
-        labels_file_name = store_path +"labels.txt"
+        total_content_matrix = np.concatenate((neg_content_array, pos_content_array), axis=0)
+        labels = np.ones((len(total_content_matrix), 1))
+        labels[:neg_content_len] = 0
 
-        if not os.path.isfile(wd_file_name):
-            file = open(wd_file_name, 'w')
+        if not os.path.isfile(self.total_comment_matrix_path):
+            file = open(self.total_comment_matrix_path, 'w')
             file.close()
-        if not os.path.isfile(labels_file_name):
-            file = open(labels_file_name, 'w')
+        if not os.path.isfile(self.labels_path):
+            file = open(self.labels_path, 'w')
             file.close()
 
-        np.savetxt(wd_file_name, total_content_matrix)
-        np.savetxt(labels_file_name, labels)
+        """
+        import numpy as np
+        保存多维数组的方式
+        a = np.random.random((2, 3, 4, 5))
+        header = ','.join(map(str, a.shape))
+        np.savetxt('test.txt', a.reshape(-1, a.shape[-1]), header=header,
+           delimiter=',')
+        加载保存多维数组的方式
+         with open('test.txt') as f:
+            shape = map(int, f.next()[1:].split(','))
+            b = np.genfromtxt(f, delimiter=',').reshape(shape)  
+            
+        # 在python2时， 使用 f.next()
+        # python3
+        #map(function, iterable, ...)  # 返回的不是list 而是 map object
+        #list(map(function, iterable, ...))  # 转成list
+        """
+        total_content_matrix_header = ','.join(map(str, total_content_matrix.shape))
+        np.savetxt(self.total_comment_matrix_path, total_content_matrix.reshape(-1, total_content_matrix.shape[-1]),
+                   header=total_content_matrix_header,
+                   delimiter=',')
+
+        labels_header = ','.join(map(str, labels.shape))
+        np.savetxt(self.labels_path, labels.reshape(-1, labels.shape[-1]), header=labels_header,
+                   delimiter=',')
+
+        # print("total_content_matrix_header: " + total_content_matrix)
+        # print("labels_header: " + labels_header)
+
         return total_content_matrix, labels
 
-    def loadembeddings(self, wd_file_name, labels_file_name):
-        wd = np.load(wd_file_name)
-        labels = np.load(labels_file_name)
 
+    def loadembeddings(self):
+        with open(self.total_comment_matrix_path) as f:
+            shape = list(map(int, f.readline()[1:].split(',')))
+            total_content_matrix = np.genfromtxt(f, delimiter=',').reshape(shape)
 
-
+        with open(self.labels_path) as f:
+            shape = list(map(int, f.readline()[1:].split(',')))
+            labels = np.genfromtxt(f, delimiter=',').reshape(shape)
+        return total_content_matrix, labels
 
 
 if __name__ == '__main__':
     data = DataPreprocess()
+    # 加载语料库
+    neg_tokenized_content_list, pos_tokenized_content_list, max_sen_length, neg_content_len, pos_content_len = data.load_corpus()
+    #加载Word2vec 模型
+    word2vec_model, vector, word_list = data.load_word2vec()
+    # 生成 评论向量 矩阵
+    total_content_matrix, labels = data.generatewordembeddings(word2vec_model, neg_tokenized_content_list,
+                                                               pos_tokenized_content_list, max_sen_length)
+    # 加载 评论向量 矩阵
+    total_content_matrix, labels = data.loadembeddings()
+    print(total_content_matrix.shape)
+    print(labels.shape)
